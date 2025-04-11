@@ -1,48 +1,83 @@
 use crate::tensor::Tensor;
 
-/// Broadcasts a tensor with shape [1] to match shape [n] (1D broadcasting only).
-fn broadcast_to(t: &Tensor, shape: &Vec<usize>) -> Tensor {
-    if t.shape == *shape {
-        return t.clone();
-    }
-    if t.shape.len() == 1 && shape.len() == 1 && t.shape[0] == 1 {
-        return Tensor::new(vec![t.data[0]; shape[0]], shape.clone());
-    }
-    panic!("Broadcast from {:?} to {:?} not supported", t.shape, shape);
-}
-
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor {
-    let shape = if a.shape == b.shape {
-        a.shape.clone()
-    } else if a.shape == vec![1] {
-        b.shape.clone()
-    } else if b.shape == vec![1] {
-        a.shape.clone()
-    } else {
-        panic!("Broadcasting not supported for shapes {:?} and {:?}", a.shape, b.shape);
-    };
-
-    let a_b = broadcast_to(a, &shape);
-    let b_b = broadcast_to(b, &shape);
-
-    let data = a_b.data.iter().zip(&b_b.data).map(|(x, y)| x + y).collect();
-    Tensor::new(data, shape)
+    let output_shape = broadcast_shapes(&a.shape, &b.shape)
+        .expect("Shape mismatch for broadcasting in add");
+    let mut result = Tensor::zeros(output_shape);
+    
+    for i in 0..result.data.len() {
+        let indices = result.calc_multi_index(i);
+        let a_indices = map_indices_for_broadcast(&indices, &a.shape);
+        let b_indices = map_indices_for_broadcast(&indices, &b.shape);
+        
+        // Use get_at instead of calculate_flat_index which is private
+        let a_value = a.get_at(&a_indices);
+        let b_value = b.get_at(&b_indices);
+        
+        result.data[i] = a_value + b_value;
+    }
+    
+    result
 }
 
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor {
-    let shape = if a.shape == b.shape {
-        a.shape.clone()
-    } else if a.shape == vec![1] {
-        b.shape.clone()
-    } else if b.shape == vec![1] {
-        a.shape.clone()
-    } else {
-        panic!("Broadcasting not supported for shapes {:?} and {:?}", a.shape, b.shape);
-    };
+    let output_shape = broadcast_shapes(&a.shape, &b.shape)
+        .expect("Shape mismatch for broadcasting in mul");
+    let mut result = Tensor::zeros(output_shape);
+    
+    for i in 0..result.data.len() {
+        let indices = result.calc_multi_index(i);
+        let a_indices = map_indices_for_broadcast(&indices, &a.shape);
+        let b_indices = map_indices_for_broadcast(&indices, &b.shape);
+        
+        // Use get_at instead of calculate_flat_index which is private
+        let a_value = a.get_at(&a_indices);
+        let b_value = b.get_at(&b_indices);
+        
+        result.data[i] = a_value * b_value;
+    }
+    
+    result
+}
 
-    let a_b = broadcast_to(a, &shape);
-    let b_b = broadcast_to(b, &shape);
+// Helper function to map output indices to input indices for broadcasted dimensions
+fn map_indices_for_broadcast(output_indices: &[usize], input_shape: &[usize]) -> Vec<usize> {
+    let mut input_indices = vec![0; input_shape.len()];
+    
+    // Start from the right (least significant dimension)
+    let out_offset = output_indices.len().saturating_sub(input_shape.len());
+    
+    for (i, &dim) in input_shape.iter().enumerate() {
+        if i + out_offset < output_indices.len() {
+            // If dimension is 1, use 0 index (broadcasting)
+            // Otherwise use the corresponding output index
+            input_indices[i] = if dim == 1 {
+                0
+            } else {
+                output_indices[i + out_offset]
+            };
+        }
+    }
+    
+    input_indices
+}
 
-    let data = a_b.data.iter().zip(&b_b.data).map(|(x, y)| x * y).collect();
-    Tensor::new(data, shape)
+pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>> {
+    let mut result = vec![];
+    let max_len = std::cmp::max(shape1.len(), shape2.len());
+    
+    for i in 0..max_len {
+        // Fix the reference issue by dereferencing and cloning
+        let dim1 = *shape1.get(shape1.len().saturating_sub(i + 1)).unwrap_or(&1);
+        let dim2 = *shape2.get(shape2.len().saturating_sub(i + 1)).unwrap_or(&1);
+        
+        if dim1 == dim2 || dim1 == 1 || dim2 == 1 {
+            result.push(std::cmp::max(dim1, dim2));
+        } else {
+            return None; // incompatible shapes
+        }
+    }
+    
+    result.reverse();
+    Some(result)
 }

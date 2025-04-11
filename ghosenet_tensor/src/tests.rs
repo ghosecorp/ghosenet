@@ -51,7 +51,7 @@ fn test_calc_offset() {
 }
 
 #[test]
-#[should_panic(expected = "Broadcasting not supported")] // adapt this if you're using Result instead of panic
+#[should_panic(expected = "Shape mismatch for broadcasting in add")] // adapt this if you're using Result instead of panic
 fn test_tensor_addition_shape_mismatch() {
     let a = Tensor::new(vec![1.0, 2.0], vec![2]);
     let b = Tensor::new(vec![3.0, 4.0, 5.0], vec![3]);
@@ -59,7 +59,7 @@ fn test_tensor_addition_shape_mismatch() {
 }
 
 #[test]
-#[should_panic(expected = "Broadcasting not supported")]
+#[should_panic(expected = "Shape mismatch for broadcasting in mul")]
 fn test_tensor_multiplication_shape_mismatch() {
     let a = Tensor::new(vec![1.0, 2.0], vec![2]);
     let b = Tensor::new(vec![3.0, 4.0, 5.0], vec![3]);
@@ -147,3 +147,24 @@ fn test_tensor_multidimensional_indexing_mutation() {
 //     let tensor = Tensor::zeros(vec![2, 2]);
 //     tensor.get_at(&[2, 1]); // Invalid
 // }
+
+
+#[test]
+fn test_tensor_addition_broadcasting() {
+    let a = Tensor::new(vec![1.0, 2.0, 3.0], vec![3, 1]);
+    let b = Tensor::new(vec![10.0, 20.0], vec![1, 2]);
+
+    let result = add(&a, &b);
+    assert_eq!(result.shape, vec![3, 2]);
+    assert_eq!(result.data, vec![11.0, 21.0, 12.0, 22.0, 13.0, 23.0]);
+}
+
+#[test]
+fn test_tensor_multiplication_broadcasting() {
+    let a = Tensor::new(vec![1.0, 2.0, 3.0], vec![3, 1]);
+    let b = Tensor::new(vec![10.0, 20.0], vec![1, 2]);
+
+    let result = mul(&a, &b);
+    assert_eq!(result.shape, vec![3, 2]);
+    assert_eq!(result.data, vec![10.0, 20.0, 20.0, 40.0, 30.0, 60.0]);
+}

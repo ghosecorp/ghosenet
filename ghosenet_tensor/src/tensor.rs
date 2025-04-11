@@ -50,9 +50,20 @@ impl Tensor {
         index
     }
 
+    pub fn calc_multi_index(&self, flat_index: usize) -> Vec<usize> {
+        let mut indices = vec![0; self.shape.len()];
+        let mut remainder = flat_index;
+        for (i, dim) in self.shape.iter().rev().enumerate() {
+            let dim = *dim;
+            indices[self.shape.len() - 1 - i] = remainder % dim;
+            remainder /= dim;
+        }
+        indices
+    }
     pub fn iter(&self) -> std::slice::Iter<f32> {
         self.data.iter()
     }
+    
 }
 
 impl Index<usize> for Tensor {
