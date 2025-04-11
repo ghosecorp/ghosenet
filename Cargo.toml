@@ -1,0 +1,7 @@
+# ghosenet/Cargo.toml
+[workspace]
+members = [
+  "ghosenet_tensor",
+  "ghosenet_core",
+  "ghosenet_cli"
+]
