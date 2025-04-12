@@ -253,13 +253,13 @@ fn test_tensor_add_autodiff() {
     result.backward();
 
     if let Some(grad) = a.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
     }
 
     if let Some(grad) = b.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
     }
 }
 
@@ -272,17 +272,17 @@ fn test_tensor_matmul_autodiff() {
     result.backward();
 
     if let Some(grad) = a.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
-        assert!(grad[2]!= 0.0);
-        assert!(grad[3]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
+        assert!(grad[2].abs() > 1e-6);
+        assert!(grad[3].abs() > 1e-6);
     }
 
     if let Some(grad) = b.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
-        assert!(grad[2]!= 0.0);
-        assert!(grad[3]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
+        assert!(grad[2].abs() > 1e-6);
+        assert!(grad[3].abs() > 1e-6);
     }
 }
 
@@ -294,8 +294,8 @@ fn test_tensor_exp_autodiff() {
     result.backward();
 
     if let Some(grad) = a.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
     }
 }
 
@@ -307,8 +307,8 @@ fn test_tensor_log_autodiff() {
     result.backward();
 
     if let Some(grad) = a.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
     }
 }
 
@@ -320,10 +320,10 @@ fn test_tensor_sum_autodiff() {
     result.backward();
 
     if let Some(grad) = a.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
-        assert!(grad[2]!= 0.0);
-        assert!(grad[3]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
+        assert!(grad[2].abs() > 1e-6);
+        assert!(grad[3].abs() > 1e-6);
     }
 }
 
@@ -335,9 +335,9 @@ fn test_tensor_mean_autodiff() {
     result.backward();
 
     if let Some(grad) = a.grad.clone() {
-        assert!(grad[0]!= 0.0);
-        assert!(grad[1]!= 0.0);
-        assert!(grad[2]!= 0.0);
-        assert!(grad[3]!= 0.0);
+        assert!(grad[0].abs() > 1e-6);
+        assert!(grad[1].abs() > 1e-6);
+        assert!(grad[2].abs() > 1e-6);
+        assert!(grad[3].abs() > 1e-6);
     }
 }

@@ -1,21 +1,19 @@
-# ghosenet_tensor
+# GhoseNet Tensor
 
 `ghosenet_tensor` is a lightweight tensor computation library written in Rust. It offers a simple and extensible API for numerical computation, built with performance and learning in mind. Think of it as a minimalist NumPy-like library for Rust and is made for machine learning or deep learning with GhoseNet.
 
----
+## Current Features
 
-## ✨ Current Features
+* **Tensor Creation**: Create tensors with custom data and shape
+* **Zero Initialization**: Create zero-filled tensors using `Tensor::zeros`
+* **Element Access**: Get and set elements using flattened indexing
+* **Element-wise Operations**: Addition and multiplication (`add`, `mul`)
+* **Shape Utilities**: Calculate flattened index with `calc_offset`
+* **Well-tested**: Comes with a full test suite for core functionality
+* **Autograd**: Automatic differentiation for computing gradients
+* **Serialization**: Save and load tensors to/from files using `save_to_file` and `load_from_file`
 
-- ✅ **Tensor Creation**: Create tensors with custom data and shape
-- ✅ **Zero Initialization**: Create zero-filled tensors using `Tensor::zeros`
-- ✅ **Element Access**: Get and set elements using flattened indexing
-- ✅ **Element-wise Operations**: Addition and multiplication (`add`, `mul`)
-- ✅ **Shape Utilities**: Calculate flattened index with `calc_offset`
-- ✅ **Well-tested**: Comes with a full test suite for core functionality
-
----
-
-## 📦 Usage
+## Usage
 
 ### Add to your project
 
@@ -55,32 +53,41 @@ let index = vec![1, 2];
 let flat_index = calc_offset(&shape, &index); // 5
 ```
 
----
+### Autograd
 
-## 🚧 Planned Features (coming soon)
+```rust
+use ghosenet_tensor::{Tensor, ops::{add, mul}};
 
-> These features are **under construction**. Once implemented, their usage and examples will be documented in the sections below.
+let a = Tensor::new(vec![1.0, 2.0], vec![2], true);
+let b = Tensor::new(vec![3.0, 4.0], vec![2], true);
 
-### 🧩 Feature Roadmap
+let c = add(a.clone(), b.clone());
+let d = mul(&c, &a);
 
-- [ ] ✅ **Indexing**: `tensor[i]` syntax using `Index` and `IndexMut` traits  
-  _Example to be added after implementation._
+d.backward();
+```
 
-- [ ] ✅ **Operator Overloading**: `tensor1 + tensor2` using `impl Add for Tensor`  
-  _Syntax sugar for more idiomatic code._
+### Serialization
 
-- [ ] ✅ **Shape Broadcasting**: Align shapes automatically like in NumPy  
-  _Enable broadcasting-based operations across dimensions._
+```rust
+use ghosenet_tensor::Tensor;
 
-- [ ] ✅ **Multi-dimensional Indexing**: `tensor[[i, j]]` support  
-  _Make it easier to read/write to tensors without computing flat indices._
+let t = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
 
-- [ ] ✅ **Performance Benchmarking**: Compare performance against other libraries  
-  _Use `criterion.rs` or native benchmarking to measure tensor ops._
+t.save_to_file("tensor.json").unwrap();
 
----
+let loaded_t = Tensor::load_from_file("tensor.json").unwrap();
+```
 
-## 📁 Project Structure
+## Planned Features (coming soon)
+
+* **Indexing**: `tensor[i]` syntax using `Index` and `IndexMut` traits
+* **Operator Overloading**: `tensor1 + tensor2` using `impl Add for Tensor`
+* **Shape Broadcasting**: Align shapes automatically like in NumPy
+* **Multi-dimensional Indexing**: `tensor[[i, j]]` support
+* **Performance Benchmarking**: Compare performance against other libraries
+
+## Project Structure
 
 ```
 src/
@@ -91,28 +98,21 @@ src/
 ├── tests.rs        # Unit tests
 ```
 
----
-
-## 🧪 Run Tests
+## Run Tests
 
 ```bash
 cargo test
 ```
 
----
-
-## 🔧 Contributing
+## Contributing
 
 PRs, ideas, and bug reports are welcome!  
 To get started with contributing to a feature above, feel free to fork and send a pull request or open a discussion.
 
----
-
-## 👨‍💻 Author
+## Author
 
 Built with ❤️ by Ghosecorp
 
-## 📝 License
+## License
 
 Apache License 2.0 — free to use, modify, and distribute.
-```

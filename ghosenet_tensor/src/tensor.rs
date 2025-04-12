@@ -169,19 +169,22 @@ impl Tensor {
 
     // Add a method to accumulate gradients
     pub fn accumulate_grad(&mut self, grad: &[f32]) {
-        if let Some(ref mut self_grad) = self.grad {
+        if self.grad.is_none() {
+            self.grad = Some(grad.to_vec());
+        } else if let Some(ref mut self_grad) = self.grad {
             assert_eq!(self_grad.len(), grad.len(), "Gradient size mismatch");
             for i in 0..self_grad.len() {
                 self_grad[i] += grad[i];
             }
         }
     }
+    
 
     pub fn backward(&mut self) {
         // Initialize gradient for output tensor
         if self.requires_grad {
             if self.grad.is_none() {
-                self.grad = Some(vec![0.0; self.data.len()]);
+                self.grad = Some(vec![1.0; self.data.len()]);
             }
             
             // Set initial gradient to 1.0 for scalar output or for the element being backpropagated
