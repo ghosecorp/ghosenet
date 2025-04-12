@@ -161,15 +161,11 @@ pub fn log(tensor: &Tensor) -> Tensor {
 }
 
 pub fn sum(tensor: &Tensor) -> Tensor {
-    let mut result = Tensor::zeros(vec![], tensor.requires_grad);
     let sum_value = tensor.data.iter().sum::<f32>();
-    result.data.push(sum_value);
-    result
+    Tensor::new(vec![sum_value], vec![], tensor.requires_grad)
 }
 
 pub fn mean(tensor: &Tensor) -> Tensor {
-    let mut result = Tensor::zeros(vec![], tensor.requires_grad);
     let mean_value = tensor.data.iter().sum::<f32>() / tensor.data.len() as f32;
-    result.data.push(mean_value);
-    result
+    Tensor::new(vec![mean_value], vec![], tensor.requires_grad)
 }

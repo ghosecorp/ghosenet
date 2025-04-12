@@ -1,5 +1,5 @@
 use crate::tensor::Tensor;
-use crate::{ops::{add, mul}, calc_offset};
+use crate::{ops::{add, mul, matmul, mean, exp, log, sum}, calc_offset};
 
 #[test]
 fn test_tensor_creation() {
@@ -167,4 +167,50 @@ fn test_tensor_multiplication_broadcasting() {
     let result = mul(&a, &b);
     assert_eq!(result.shape, vec![3, 2]);
     assert_eq!(result.data, vec![10.0, 20.0, 20.0, 40.0, 30.0, 60.0]);
+}
+
+#[test]
+fn test_tensor_exp() {
+    let a = Tensor::new(vec![1.0, 0.0], vec![2], false);
+    let result = exp(&a);
+    assert_eq!(result.data, vec![1.0_f32.exp(), 0.0_f32.exp()]);
+}
+
+#[test]
+fn test_tensor_log() {
+    let a = Tensor::new(vec![1.0, std::f32::consts::E], vec![2], false);
+    let result = log(&a);
+    assert!((result.data[0] - 0.0).abs() < 1e-6);
+    assert!((result.data[1] - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_tensor_sum() {
+    let a = Tensor::new(vec![1.0, 2.0, 3.0], vec![3], false);
+    let result = sum(&a);
+    assert_eq!(result.data[0], 6.0);
+}
+
+#[test]
+fn test_tensor_mean() {
+    let a = Tensor::new(vec![2.0, 4.0], vec![2], false);
+    let result = mean(&a);
+    assert_eq!(result.data[0], 3.0);
+}
+
+#[test]
+fn test_tensor_matmul() {
+    let a = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2], false);
+    let b = Tensor::new(vec![5.0, 6.0, 7.0, 8.0], vec![2, 2], false);
+    let result = matmul(&a, &b);
+    assert_eq!(result.data, vec![19.0, 22.0, 43.0, 50.0]);
+}
+
+#[test]
+fn test_tensor_broadcast_add() {
+    let a = Tensor::new(vec![1.0, 2.0], vec![2, 1], false);
+    let b = Tensor::new(vec![3.0, 4.0], vec![1, 2], false);
+    let result = add(&a, &b);
+    assert_eq!(result.shape, vec![2, 2]);
+    assert_eq!(result.data, vec![4.0, 5.0, 5.0, 6.0]);
 }
