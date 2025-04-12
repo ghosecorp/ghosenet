@@ -1,27 +1,107 @@
-// tensor.ts
+// tensor.rs
 use std::ops::{Add, Mul, Index, IndexMut};
-// use crate::ops::{add, mul, exp, log, sum, mean};
+use std::rc::Rc;
+use std::cell::RefCell;
 use crate::ops::{add, mul};
 
 use serde::{Serialize, Deserialize};
-// use serde_json::{to_string, from_str};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// Define operation types for the computational graph
+#[derive(Debug, Clone)]
+pub enum OpType {
+    Add,
+    Mul,
+    MatMul,
+    Exp,
+    Log,
+    Sum,
+    Mean,
+    Div,
+    Sub,
+    Input,  // Placeholder for leaf tensors
+}
+
+pub struct OpNode {
+    pub op_type: OpType,
+    pub inputs: Vec<Rc<RefCell<Tensor>>>,
+    pub backward: Option<Box<dyn Fn(&Tensor) -> ()>>,
+}
+
+// Manually implement Debug
+impl std::fmt::Debug for OpNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpNode")
+            .field("op_type", &self.op_type)
+            .field("inputs", &self.inputs)
+            .field("backward", &if self.backward.is_some() { "Some(Fn)" } else { "None" })
+            .finish()
+    }
+}
+
+// Manually implement Clone
+impl Clone for OpNode {
+    fn clone(&self) -> Self {
+        OpNode {
+            op_type: self.op_type.clone(),
+            inputs: self.inputs.clone(),
+            // We can't clone the function, so set it to None when cloning
+            backward: None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Tensor {
     pub data: Vec<f32>,
     pub shape: Vec<usize>,
     pub grad: Option<Vec<f32>>,
     pub requires_grad: bool,
+    
+    #[serde(skip)]
+    pub op: Option<OpNode>,  // Operation that created this tensor
+    #[serde(skip)]
+    pub grad_fn: Option<Box<dyn Fn() -> ()>>,  // Function to compute gradients
+}
+
+// Implement Debug manually:
+impl std::fmt::Debug for Tensor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tensor")
+            .field("data", &self.data)
+            .field("shape", &self.shape)
+            .field("grad", &self.grad)
+            .field("requires_grad", &self.requires_grad)
+            .field("op", &self.op)
+            .field("grad_fn", &if self.grad_fn.is_some() { "<function>" } else { "None" })
+            .finish()
+    }
+}
+
+// Implement Clone manually:
+impl Clone for Tensor {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            shape: self.shape.clone(),
+            grad: self.grad.clone(),
+            requires_grad: self.requires_grad,
+            op: self.op.clone(),
+            grad_fn: None, // We cannot clone the function
+        }
+    }
 }
 
 impl Tensor {
     pub fn new(data: Vec<f32>, shape: Vec<usize>, requires_grad: bool) -> Self {
         assert_eq!(data.len(), shape.iter().product::<usize>(), "Shape mismatch");
+        let data_len = data.len();
         Tensor {
             data,
             shape,
-            grad: None,
+            grad: if requires_grad { Some(vec![0.0; data_len]) } else { None },
             requires_grad,
+            op: None,
+            grad_fn: None,
         }
     }
 
@@ -30,12 +110,17 @@ impl Tensor {
         Tensor {
             data: vec![0.0; size],
             shape,
-            grad: None,
+            grad: if requires_grad { Some(vec![0.0; size]) } else { None },
             requires_grad,
+            op: None,
+            grad_fn: None,
         }
     }
 
     pub fn get(&self, index: usize) -> f32 {
+        if index >= self.data.len() {
+            panic!("index out of bounds: the len is {} but the index is {}", self.data.len(), index);
+        }
         self.data[index]
     }
 
@@ -45,6 +130,9 @@ impl Tensor {
 
     pub fn get_at(&self, indices: &[usize]) -> f32 {
         let flat_index = self.calculate_flat_index(indices);
+        if flat_index >= self.data.len() {
+            panic!("index out of bounds: the len is {} but the index is {}", self.data.len(), flat_index);
+        }
         self.data[flat_index]
     }
 
@@ -53,7 +141,7 @@ impl Tensor {
         self.data[flat_index] = value;
     }
 
-    fn calculate_flat_index(&self, indices: &[usize]) -> usize {
+    pub fn calculate_flat_index(&self, indices: &[usize]) -> usize {
         assert_eq!(indices.len(), self.shape.len(), "Dimension mismatch");
         let mut index = 0;
         let mut stride = 1;
@@ -74,45 +162,54 @@ impl Tensor {
         }
         indices
     }
+    
     pub fn iter(&self) -> std::slice::Iter<f32> {
         self.data.iter()
     }
 
+    // Add a method to accumulate gradients
+    pub fn accumulate_grad(&mut self, grad: &[f32]) {
+        if let Some(ref mut self_grad) = self.grad {
+            assert_eq!(self_grad.len(), grad.len(), "Gradient size mismatch");
+            for i in 0..self_grad.len() {
+                self_grad[i] += grad[i];
+            }
+        }
+    }
+
     pub fn backward(&mut self) {
+        // Initialize gradient for output tensor
         if self.requires_grad {
             if self.grad.is_none() {
-                // Start with gradient of 1.0 for the output tensor
-                let mut grad = vec![0.0; self.data.len()];
-                
-                // For scalar output, set gradient to 1.0
-                // For multi-element tensor, this could be modified based on needs
-                if self.data.len() == 1 {
-                    grad[0] = 1.0;
-                } else {
-                    // For non-scalar tensors, we need the calling code to set
-                    // the initial gradient, or we can set it to 1.0 for each element
-                    for i in 0..grad.len() {
-                        grad[i] = 1.0;
-                    }
-                }
-                
-                self.grad = Some(grad);
+                self.grad = Some(vec![0.0; self.data.len()]);
             }
             
-            // Here's where we would propagate the gradient backward through
-            // the computation graph, but we need to track operations first
+            // Set initial gradient to 1.0 for scalar output or for the element being backpropagated
+            let grad = self.grad.as_mut().unwrap();
+            if self.data.len() == 1 {
+                grad[0] = 1.0;
+            } else {
+                // For non-scalar tensors, set all gradients to 1.0
+                // In practice, you might want to be more specific about which gradient to set
+                for i in 0..grad.len() {
+                    grad[i] = 1.0;
+                }
+            }
             
-            // For a complete autodiff system, you would need to:
-            // 1. Track operations that created this tensor
-            // 2. For each operation, compute gradients with respect to inputs
-            // 3. Accumulate these gradients in the input tensors
-            // 4. Call backward recursively on input tensors
+            // Call the gradient function if it exists
+            if let Some(ref grad_fn) = self.grad_fn {
+                grad_fn();
+            }
         }
     }
 
     // Utility to reset the gradients
     pub fn zero_grad(&mut self) {
-        self.grad = None;
+        if let Some(ref mut grad) = self.grad {
+            for g in grad.iter_mut() {
+                *g = 0.0;
+            }
+        }
     }
 
     // Serialization: Save Tensor to file
@@ -135,7 +232,6 @@ impl Tensor {
         let tensor: Tensor = serde_json::from_str(&contents)?;
         Ok(tensor)
     }
-    
 }
 
 impl Index<usize> for Tensor {

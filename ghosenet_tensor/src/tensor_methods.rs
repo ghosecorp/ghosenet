@@ -8,12 +8,13 @@ use crate::ops::{add, mul};
 impl Tensor {
     pub fn new(data: Vec<f32>, shape: Vec<usize>, requires_grad: bool) -> Self {
         assert_eq!(data.len(), shape.iter().product::<usize>(), "Shape mismatch");
-        let size = data.len(); // Store the length before moving data
+        let data_len = data.len();
         Tensor {
             data,
             shape,
-            grad: if requires_grad { Some(vec![0.0; size]) } else { None },
+            grad: if requires_grad { Some(vec![0.0; data_len]) } else { None },
             requires_grad,
+            op: None,
             grad_fn: None,
         }
     }
@@ -47,7 +48,7 @@ impl Tensor {
         self.data[flat_index] = value;
     }
     
-    fn calculate_flat_index(&self, indices: &[usize]) -> usize {
+    pub fn calculate_flat_index(&self, indices: &[usize]) -> usize {
         assert_eq!(indices.len(), self.shape.len(), "Dimension mismatch");
         let mut index = 0;
         let mut stride = 1;

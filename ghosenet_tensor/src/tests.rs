@@ -134,19 +134,19 @@ fn test_tensor_multidimensional_indexing_mutation() {
     assert_eq!(tensor.get_at(&[2, 1]), 7.0);
 }
 
-// #[test]
-// #[should_panic(expected = "Index out of bounds")]
-// fn test_tensor_flat_index_out_of_bounds() {
-//     let tensor = Tensor::zeros(vec![2, 2]);
-//     tensor.get(5); // Invalid
-// }
+#[test]
+#[should_panic(expected = "index out of bounds: the len is 4 but the index is 5")]
+fn test_tensor_flat_index_out_of_bounds() {
+    let tensor = Tensor::zeros(vec![2, 2], false);
+    tensor.get(5); // Invalid
+}
 
-// #[test]
-// #[should_panic(expected = "Index out of bounds")]
-// fn test_tensor_multidimensional_index_out_of_bounds() {
-//     let tensor = Tensor::zeros(vec![2, 2]);
-//     tensor.get_at(&[2, 1]); // Invalid
-// }
+#[test]
+#[should_panic(expected = "index out of bounds: the len is 4 but the index is 5")]
+fn test_tensor_multidimensional_index_out_of_bounds() {
+    let tensor = Tensor::zeros(vec![2, 2], false);
+    tensor.get_at(&[2, 1]); // Invalid
+}
 
 
 #[test]
@@ -242,4 +242,102 @@ fn test_tensor_backward() {
     // In a complete implementation, we would also check:
     // assert_eq!(a.grad.unwrap(), vec![1.0, 1.0]); 
     // assert_eq!(b.grad.unwrap(), vec![1.0, 1.0]);
+}
+
+#[test]
+fn test_tensor_add_autodiff() {
+    let a = Tensor::new(vec![1.0, 2.0], vec![2], true);
+    let b = Tensor::new(vec![3.0, 4.0], vec![2], true);
+    let mut result = add(&a, &b);
+
+    result.backward();
+
+    if let Some(grad) = a.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+    }
+
+    if let Some(grad) = b.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+    }
+}
+
+#[test]
+fn test_tensor_matmul_autodiff() {
+    let a = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2], true);
+    let b = Tensor::new(vec![5.0, 6.0, 7.0, 8.0], vec![2, 2], true);
+    let mut result = matmul(&a, &b);
+
+    result.backward();
+
+    if let Some(grad) = a.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+        assert!(grad[2]!= 0.0);
+        assert!(grad[3]!= 0.0);
+    }
+
+    if let Some(grad) = b.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+        assert!(grad[2]!= 0.0);
+        assert!(grad[3]!= 0.0);
+    }
+}
+
+#[test]
+fn test_tensor_exp_autodiff() {
+    let a = Tensor::new(vec![1.0, 2.0], vec![2], true);
+    let mut result = exp(&a);
+
+    result.backward();
+
+    if let Some(grad) = a.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+    }
+}
+
+#[test]
+fn test_tensor_log_autodiff() {
+    let a = Tensor::new(vec![1.0, 2.0], vec![2], true);
+    let mut result = log(&a);
+
+    result.backward();
+
+    if let Some(grad) = a.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+    }
+}
+
+#[test]
+fn test_tensor_sum_autodiff() {
+    let a = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2], true);
+    let mut result = sum(&a);
+
+    result.backward();
+
+    if let Some(grad) = a.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+        assert!(grad[2]!= 0.0);
+        assert!(grad[3]!= 0.0);
+    }
+}
+
+#[test]
+fn test_tensor_mean_autodiff() {
+    let a = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2], true);
+    let mut result = mean(&a);
+
+    result.backward();
+
+    if let Some(grad) = a.grad.clone() {
+        assert!(grad[0]!= 0.0);
+        assert!(grad[1]!= 0.0);
+        assert!(grad[2]!= 0.0);
+        assert!(grad[3]!= 0.0);
+    }
 }
