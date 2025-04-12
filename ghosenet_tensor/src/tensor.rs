@@ -1,10 +1,10 @@
 // tensor.rs
-use std::ops::{Add, Mul, Index, IndexMut};
-use std::rc::Rc;
+use crate::ops::{add, mul, select};
 use std::cell::RefCell;
-use crate::ops::{add, mul};
+use std::ops::{Add, Index, IndexMut, Mul};
+use std::rc::Rc;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // Define operation types for the computational graph
 #[derive(Debug, Clone)]
@@ -18,7 +18,9 @@ pub enum OpType {
     Mean,
     Div,
     Sub,
-    Input,  // Placeholder for leaf tensors
+    Abs,
+    Select,
+    Input, // Placeholder for leaf tensors
 }
 
 pub struct OpNode {
@@ -33,7 +35,14 @@ impl std::fmt::Debug for OpNode {
         f.debug_struct("OpNode")
             .field("op_type", &self.op_type)
             .field("inputs", &self.inputs)
-            .field("backward", &if self.backward.is_some() { "Some(Fn)" } else { "None" })
+            .field(
+                "backward",
+                &if self.backward.is_some() {
+                    "Some(Fn)"
+                } else {
+                    "None"
+                },
+            )
             .finish()
     }
 }
@@ -56,11 +65,11 @@ pub struct Tensor {
     pub shape: Vec<usize>,
     pub grad: Option<Vec<f32>>,
     pub requires_grad: bool,
-    
+
     #[serde(skip)]
-    pub op: Option<OpNode>,  // Operation that created this tensor
+    pub op: Option<OpNode>, // Operation that created this tensor
     #[serde(skip)]
-    pub grad_fn: Option<Box<dyn Fn() -> ()>>,  // Function to compute gradients
+    pub grad_fn: Option<Box<dyn Fn() -> ()>>, // Function to compute gradients
 }
 
 // Implement Debug manually:
@@ -72,7 +81,14 @@ impl std::fmt::Debug for Tensor {
             .field("grad", &self.grad)
             .field("requires_grad", &self.requires_grad)
             .field("op", &self.op)
-            .field("grad_fn", &if self.grad_fn.is_some() { "<function>" } else { "None" })
+            .field(
+                "grad_fn",
+                &if self.grad_fn.is_some() {
+                    "<function>"
+                } else {
+                    "None"
+                },
+            )
             .finish()
     }
 }
@@ -93,12 +109,20 @@ impl Clone for Tensor {
 
 impl Tensor {
     pub fn new(data: Vec<f32>, shape: Vec<usize>, requires_grad: bool) -> Self {
-        assert_eq!(data.len(), shape.iter().product::<usize>(), "Shape mismatch");
+        assert_eq!(
+            data.len(),
+            shape.iter().product::<usize>(),
+            "Shape mismatch"
+        );
         let data_len = data.len();
         Tensor {
             data,
             shape,
-            grad: if requires_grad { Some(vec![0.0; data_len]) } else { None },
+            grad: if requires_grad {
+                Some(vec![0.0; data_len])
+            } else {
+                None
+            },
             requires_grad,
             op: None,
             grad_fn: None,
@@ -110,7 +134,11 @@ impl Tensor {
         Tensor {
             data: vec![0.0; size],
             shape,
-            grad: if requires_grad { Some(vec![0.0; size]) } else { None },
+            grad: if requires_grad {
+                Some(vec![0.0; size])
+            } else {
+                None
+            },
             requires_grad,
             op: None,
             grad_fn: None,
@@ -119,7 +147,11 @@ impl Tensor {
 
     pub fn get(&self, index: usize) -> f32 {
         if index >= self.data.len() {
-            panic!("index out of bounds: the len is {} but the index is {}", self.data.len(), index);
+            panic!(
+                "index out of bounds: the len is {} but the index is {}",
+                self.data.len(),
+                index
+            );
         }
         self.data[index]
     }
@@ -131,7 +163,11 @@ impl Tensor {
     pub fn get_at(&self, indices: &[usize]) -> f32 {
         let flat_index = self.calculate_flat_index(indices);
         if flat_index >= self.data.len() {
-            panic!("index out of bounds: the len is {} but the index is {}", self.data.len(), flat_index);
+            panic!(
+                "index out of bounds: the len is {} but the index is {}",
+                self.data.len(),
+                flat_index
+            );
         }
         self.data[flat_index]
     }
@@ -162,7 +198,7 @@ impl Tensor {
         }
         indices
     }
-    
+
     pub fn iter(&self) -> std::slice::Iter<f32> {
         self.data.iter()
     }
@@ -178,7 +214,6 @@ impl Tensor {
             }
         }
     }
-    
 
     pub fn backward(&mut self) {
         // Initialize gradient for output tensor
@@ -186,7 +221,7 @@ impl Tensor {
             if self.grad.is_none() {
                 self.grad = Some(vec![1.0; self.data.len()]);
             }
-            
+
             // Set initial gradient to 1.0 for scalar output or for the element being backpropagated
             let grad = self.grad.as_mut().unwrap();
             if self.data.len() == 1 {
@@ -198,7 +233,7 @@ impl Tensor {
                     grad[i] = 1.0;
                 }
             }
-            
+
             // Call the gradient function if it exists
             if let Some(ref grad_fn) = self.grad_fn {
                 grad_fn();
@@ -235,6 +270,83 @@ impl Tensor {
         let tensor: Tensor = serde_json::from_str(&contents)?;
         Ok(tensor)
     }
+
+    // Inside impl Tensor
+    // pub fn randn(shape: Vec<usize>, requires_grad: bool) -> Self {
+    //     use rand_distr::{Distribution, Normal};
+
+    //     let total_elems = shape.iter().product();
+    //     let normal = Normal::new(0.0, 1.0).unwrap();
+    //     let data: Vec<f32> = (0..total_elems)
+    //         .map(|_| normal.sample(&mut rand::thread_rng()) as f32)
+    //         .collect();
+
+    //     Tensor::new(data, shape, requires_grad)
+    // }
+
+    pub fn transpose(&self) -> Self {
+        let rows = self.shape[0];
+        let cols = self.shape[1];
+        let mut transposed_data = vec![0.0; self.data.len()];
+
+        for i in 0..rows {
+            for j in 0..cols {
+                transposed_data[j * rows + i] = self.data[i * cols + j];
+            }
+        }
+
+        Tensor::new(transposed_data, vec![cols, rows], self.requires_grad)
+    }
+
+    pub fn shape(&self) -> &Vec<usize> {
+        &self.shape
+    }
+
+    pub fn abs(&self) -> Tensor {
+        let result_data: Vec<f32> = self.data.iter().map(|&x| x.abs()).collect();
+        let mut result = Tensor::new(result_data, self.shape.clone(), self.requires_grad);
+
+        if self.requires_grad {
+            let input = Rc::new(RefCell::new(self.clone()));
+            let backward_input = Rc::clone(&input);
+
+            result.op = Some(OpNode {
+                op_type: OpType::Abs,
+                inputs: vec![Rc::clone(&input)],
+                backward: Some(Box::new(move |grad: &Tensor| {
+                    let input_ref = backward_input.borrow();
+                    let sign_data: Vec<f32> = input_ref.data.iter()
+                        .map(|&x| if x > 0.0 { 1.0 } else if x < 0.0 { -1.0 } else { 0.0 })
+                        .collect();
+                    let sign_tensor = Tensor::new(sign_data, input_ref.shape.clone(), false);
+                    let local_grad = mul(grad, &sign_tensor);
+
+                    drop(input_ref); // Drop immutable borrow
+
+                    // Mutate parent's gradient in place
+                    let mut input_mut = backward_input.borrow_mut();
+                    if let Some(ref mut g) = input_mut.grad {
+                        for (i, val) in local_grad.data.iter().enumerate() {
+                            g[i] += val;
+                        }
+                    } else {
+                        input_mut.grad = Some(local_grad.data.clone());
+                    }
+                })),
+            });
+        }
+
+        result
+    }
+
+    pub fn less_than_scalar(&self, scalar: f32) -> Tensor {
+        let mask_data: Vec<f32> = self.data.iter().map(|&x| if x < scalar { 1.0 } else { 0.0 }).collect();
+        Tensor::new(mask_data, self.shape.clone(), false)
+    }
+
+    pub fn select(&self, if_true: &Tensor, if_false: &Tensor) -> Tensor {
+        select(self, if_true, if_false)
+    }   
 }
 
 impl Index<usize> for Tensor {

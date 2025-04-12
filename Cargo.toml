@@ -4,4 +4,4 @@ members = [
   "ghosenet_tensor",
   "ghosenet_core",
   "ghosenet_cli"
-]
+, "ghosenet_nn"]

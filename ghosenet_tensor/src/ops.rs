@@ -808,3 +808,81 @@ pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>
     result.reverse();
     Some(result)
 }
+
+pub fn select(mask: &Tensor, if_true: &Tensor, if_false: &Tensor) -> Tensor {
+    assert_eq!(mask.shape, if_true.shape);
+    assert_eq!(if_true.shape, if_false.shape);
+
+    let selected_data: Vec<f32> = mask
+        .data
+        .iter()
+        .zip(&if_true.data)
+        .zip(&if_false.data)
+        .map(|((&m, &t), &f)| if m == 1.0 { t } else { f })
+        .collect();
+
+    let mut result = Tensor::new(
+        selected_data,
+        mask.shape.clone(),
+        if_true.requires_grad || if_false.requires_grad,
+    );
+
+    if result.requires_grad {
+        let mask_rc = Rc::new(RefCell::new(mask.clone()));
+        let true_rc = Rc::new(RefCell::new(if_true.clone()));
+        let false_rc = Rc::new(RefCell::new(if_false.clone()));
+
+        let mask_clone = Rc::clone(&mask_rc);
+        let true_clone = Rc::clone(&true_rc);
+        let false_clone = Rc::clone(&false_rc);
+
+        result.op = Some(OpNode {
+            op_type: OpType::Input, // Or a new variant like `Select` if you want
+            inputs: vec![Rc::clone(&mask_rc), Rc::clone(&true_rc), Rc::clone(&false_rc)],
+            backward: Some(Box::new(move |grad: &Tensor| {
+                let mask_borrow = mask_clone.borrow();
+                let true_borrow = true_clone.borrow();
+                let false_borrow = false_clone.borrow();
+
+                let mut grad_true = vec![0.0; grad.data.len()];
+                let mut grad_false = vec![0.0; grad.data.len()];
+
+                for i in 0..grad.data.len() {
+                    if mask_borrow.data[i] == 1.0 {
+                        grad_true[i] = grad.data[i];
+                    } else {
+                        grad_false[i] = grad.data[i];
+                    }
+                }
+
+                let t_grad = Tensor::new(grad_true, grad.shape.clone(), false);
+                let f_grad = Tensor::new(grad_false, grad.shape.clone(), false);
+
+                // Accumulate gradients
+                if true_borrow.requires_grad {
+                    let mut true_mut = true_clone.borrow_mut();
+                    if let Some(ref mut g) = true_mut.grad {
+                        for i in 0..g.len() {
+                            g[i] += t_grad.data[i];
+                        }
+                    } else {
+                        true_mut.grad = Some(t_grad.data.clone());
+                    }
+                }
+
+                if false_borrow.requires_grad {
+                    let mut false_mut = false_clone.borrow_mut();
+                    if let Some(ref mut g) = false_mut.grad {
+                        for i in 0..g.len() {
+                            g[i] += f_grad.data[i];
+                        }
+                    } else {
+                        false_mut.grad = Some(f_grad.data.clone());
+                    }
+                }
+            })),
+        });
+    }
+
+    result
+}
