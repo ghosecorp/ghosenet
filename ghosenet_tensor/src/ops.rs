@@ -10,11 +10,29 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor {
         let a_indices = map_indices_for_broadcast(&indices, &a.shape);
         let b_indices = map_indices_for_broadcast(&indices, &b.shape);
         
-        // Use get_at instead of calculate_flat_index which is private
         let a_value = a.get_at(&a_indices);
         let b_value = b.get_at(&b_indices);
         
         result.data[i] = a_value + b_value;
+    }
+    
+    result
+}
+
+pub fn sub(a: &Tensor, b: &Tensor) -> Tensor {
+    let output_shape = broadcast_shapes(&a.shape, &b.shape)
+        .expect("Shape mismatch for broadcasting in sub");
+    let mut result = Tensor::zeros(output_shape);
+    
+    for i in 0..result.data.len() {
+        let indices = result.calc_multi_index(i);
+        let a_indices = map_indices_for_broadcast(&indices, &a.shape);
+        let b_indices = map_indices_for_broadcast(&indices, &b.shape);
+        
+        let a_value = a.get_at(&a_indices);
+        let b_value = b.get_at(&b_indices);
+        
+        result.data[i] = a_value - b_value;
     }
     
     result
@@ -30,11 +48,53 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor {
         let a_indices = map_indices_for_broadcast(&indices, &a.shape);
         let b_indices = map_indices_for_broadcast(&indices, &b.shape);
         
-        // Use get_at instead of calculate_flat_index which is private
         let a_value = a.get_at(&a_indices);
         let b_value = b.get_at(&b_indices);
         
         result.data[i] = a_value * b_value;
+    }
+    
+    result
+}
+
+pub fn div(a: &Tensor, b: &Tensor) -> Tensor {
+    let output_shape = broadcast_shapes(&a.shape, &b.shape)
+        .expect("Shape mismatch for broadcasting in div");
+    let mut result = Tensor::zeros(output_shape);
+    
+    for i in 0..result.data.len() {
+        let indices = result.calc_multi_index(i);
+        let a_indices = map_indices_for_broadcast(&indices, &a.shape);
+        let b_indices = map_indices_for_broadcast(&indices, &b.shape);
+        
+        let a_value = a.get_at(&a_indices);
+        let b_value = b.get_at(&b_indices);
+        
+        result.data[i] = a_value / b_value;
+    }
+    
+    result
+}
+
+pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor {
+    assert_eq!(a.shape.len(), 2, "First tensor must be 2D for matmul");
+    assert_eq!(b.shape.len(), 2, "Second tensor must be 2D for matmul");
+    assert_eq!(a.shape[1], b.shape[0], "Inner dimensions must match for matmul");
+    
+    let m = a.shape[0];
+    let n = b.shape[1];
+    let k = a.shape[1];
+    
+    let mut result = Tensor::zeros(vec![m, n]);
+    
+    for i in 0..m {
+        for j in 0..n {
+            let mut sum = 0.0;
+            for p in 0..k {
+                sum += a.get_at(&[i, p]) * b.get_at(&[p, j]);
+            }
+            result.set_at(&[i, j], sum);
+        }
     }
     
     result
@@ -67,7 +127,6 @@ pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>
     let max_len = std::cmp::max(shape1.len(), shape2.len());
     
     for i in 0..max_len {
-        // Fix the reference issue by dereferencing and cloning
         let dim1 = *shape1.get(shape1.len().saturating_sub(i + 1)).unwrap_or(&1);
         let dim2 = *shape2.get(shape2.len().saturating_sub(i + 1)).unwrap_or(&1);
         
