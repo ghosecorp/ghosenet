@@ -1,3 +1,4 @@
+// tensor.ts
 use std::ops::{Add, Mul, Index, IndexMut};
 // use crate::ops::{add, mul, exp, log, sum, mean};
 use crate::ops::{add, mul};
@@ -78,10 +79,35 @@ impl Tensor {
     }
 
     pub fn backward(&mut self) {
-        // if let Some(grad) = &mut self.grad {
-        //     // Backpropagate gradient for the tensor
-        //     // Implement the backward pass here.
-        // }
+        if self.requires_grad {
+            if self.grad.is_none() {
+                // Start with gradient of 1.0 for the output tensor
+                let mut grad = vec![0.0; self.data.len()];
+                
+                // For scalar output, set gradient to 1.0
+                // For multi-element tensor, this could be modified based on needs
+                if self.data.len() == 1 {
+                    grad[0] = 1.0;
+                } else {
+                    // For non-scalar tensors, we need the calling code to set
+                    // the initial gradient, or we can set it to 1.0 for each element
+                    for i in 0..grad.len() {
+                        grad[i] = 1.0;
+                    }
+                }
+                
+                self.grad = Some(grad);
+            }
+            
+            // Here's where we would propagate the gradient backward through
+            // the computation graph, but we need to track operations first
+            
+            // For a complete autodiff system, you would need to:
+            // 1. Track operations that created this tensor
+            // 2. For each operation, compute gradients with respect to inputs
+            // 3. Accumulate these gradients in the input tensors
+            // 4. Call backward recursively on input tensors
+        }
     }
 
     // Utility to reset the gradients
