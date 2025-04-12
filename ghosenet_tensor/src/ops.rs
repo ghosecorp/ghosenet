@@ -3,7 +3,9 @@ use crate::tensor::Tensor;
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor {
     let output_shape = broadcast_shapes(&a.shape, &b.shape)
         .expect("Shape mismatch for broadcasting in add");
-    let mut result = Tensor::zeros(output_shape);
+
+
+    let mut result = Tensor::zeros(output_shape, a.requires_grad || b.requires_grad);
     
     for i in 0..result.data.len() {
         let indices = result.calc_multi_index(i);
@@ -22,7 +24,7 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor {
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor {
     let output_shape = broadcast_shapes(&a.shape, &b.shape)
         .expect("Shape mismatch for broadcasting in sub");
-    let mut result = Tensor::zeros(output_shape);
+    let mut result = Tensor::zeros(output_shape, a.requires_grad || b.requires_grad);
     
     for i in 0..result.data.len() {
         let indices = result.calc_multi_index(i);
@@ -41,7 +43,8 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor {
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor {
     let output_shape = broadcast_shapes(&a.shape, &b.shape)
         .expect("Shape mismatch for broadcasting in mul");
-    let mut result = Tensor::zeros(output_shape);
+    
+    let mut result = Tensor::zeros(output_shape, a.requires_grad || b.requires_grad);
     
     for i in 0..result.data.len() {
         let indices = result.calc_multi_index(i);
@@ -60,7 +63,7 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor {
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor {
     let output_shape = broadcast_shapes(&a.shape, &b.shape)
         .expect("Shape mismatch for broadcasting in div");
-    let mut result = Tensor::zeros(output_shape);
+    let mut result = Tensor::zeros(output_shape, a.requires_grad || b.requires_grad);
     
     for i in 0..result.data.len() {
         let indices = result.calc_multi_index(i);
@@ -85,7 +88,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor {
     let n = b.shape[1];
     let k = a.shape[1];
     
-    let mut result = Tensor::zeros(vec![m, n]);
+    let mut result = Tensor::zeros(vec![m, n], a.requires_grad || b.requires_grad);
     
     for i in 0..m {
         for j in 0..n {
@@ -139,4 +142,34 @@ pub fn broadcast_shapes(shape1: &[usize], shape2: &[usize]) -> Option<Vec<usize>
     
     result.reverse();
     Some(result)
+}
+
+pub fn exp(tensor: &Tensor) -> Tensor {
+    let mut result = Tensor::zeros(tensor.shape.clone(), tensor.requires_grad);
+    for i in 0..tensor.data.len() {
+        result.data[i] = tensor.data[i].exp();
+    }
+    result
+}
+
+pub fn log(tensor: &Tensor) -> Tensor {
+    let mut result = Tensor::zeros(tensor.shape.clone(), tensor.requires_grad);
+    for i in 0..tensor.data.len() {
+        result.data[i] = tensor.data[i].ln();
+    }
+    result
+}
+
+pub fn sum(tensor: &Tensor) -> Tensor {
+    let mut result = Tensor::zeros(vec![], tensor.requires_grad);
+    let sum_value = tensor.data.iter().sum::<f32>();
+    result.data.push(sum_value);
+    result
+}
+
+pub fn mean(tensor: &Tensor) -> Tensor {
+    let mut result = Tensor::zeros(vec![], tensor.requires_grad);
+    let mean_value = tensor.data.iter().sum::<f32>() / tensor.data.len() as f32;
+    result.data.push(mean_value);
+    result
 }
