@@ -768,6 +768,75 @@ pub fn mean(tensor: &Tensor) -> Tensor {
     result
 }
 
+pub fn var(tensor: &Tensor, eps: f32) -> Tensor {
+    let mean_value = tensor.data.iter().sum::<f32>() / tensor.data.len() as f32;
+    let variance = tensor
+        .data
+        .iter()
+        .map(|x| (x - mean_value).powi(2))
+        .sum::<f32>()
+        / tensor.data.len() as f32;
+
+    let var_value = variance + eps;
+    let mut result = Tensor::new(vec![var_value], vec![], tensor.requires_grad);
+
+    // Add operation tracking and backward function for autodiff
+    if tensor.requires_grad {
+        let tensor_rc = Rc::new(RefCell::new(tensor.clone()));
+        let tensor_weak = tensor_rc.clone();
+        let result_shape = result.shape.clone();
+        let tensor_len = tensor.data.len() as f32;
+
+        result.op = Some(OpNode {
+            op_type: OpType::Var,
+            inputs: vec![tensor_rc],
+            backward: Some(Box::new(move |grad_output: &Tensor| {
+                if let Some(ref mut tensor_mut) = tensor_weak.try_borrow_mut().ok() {
+                    if tensor_mut.requires_grad {
+                        // Gradient of variance wrt input: 2(x - mean) / n
+                        let grad_value = grad_output.data[0];
+                        let mean = tensor_mut.data.iter().sum::<f32>() / tensor_mut.data.len() as f32;
+                        let grads: Vec<f32> = tensor_mut
+                            .data
+                            .iter()
+                            .map(|x| 2.0 * (x - mean) * grad_value / tensor_len)
+                            .collect();
+
+                        tensor_mut.accumulate_grad(&grads);
+                    }
+                }
+            })),
+        });
+
+        let result_ref = Rc::new(RefCell::new(result.clone()));
+        result.grad_fn = Some(Box::new(move || {
+            if let Some(ref result_tensor) = result_ref.try_borrow().ok() {
+                if let Some(ref grad) = result_tensor.grad {
+                    if let Some(ref op) = result_tensor.op {
+                        if let Some(ref backward_fn) = op.backward {
+                            let grad_tensor = Tensor::new(grad.clone(), result_shape.clone(), false);
+                            backward_fn(&grad_tensor);
+
+                            for input in &op.inputs {
+                                if let Some(ref mut input_tensor) = input.try_borrow_mut().ok() {
+                                    if input_tensor.requires_grad {
+                                        if let Some(ref input_grad_fn) = input_tensor.grad_fn {
+                                            input_grad_fn();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }));
+    }
+
+    result
+}
+
+
 // Helper function to map output indices to input indices for broadcasted dimensions
 fn map_indices_for_broadcast(output_indices: &[usize], input_shape: &[usize]) -> Vec<usize> {
     let mut input_indices = vec![0; input_shape.len()];

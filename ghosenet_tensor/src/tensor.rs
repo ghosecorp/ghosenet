@@ -20,6 +20,7 @@ pub enum OpType {
     Sub,
     Abs,
     Select,
+    Var,
     Input, // Placeholder for leaf tensors
 }
 
