@@ -145,6 +145,22 @@ impl Tensor {
         }
     }
 
+    pub fn ones(shape: Vec<usize>, requires_grad: bool) -> Self {
+        let size = shape.iter().product::<usize>();
+        Tensor {
+            data: vec![1.0; size],
+            shape,
+            grad: if requires_grad {
+                Some(vec![1.0; size])
+            } else {
+                None
+            },
+            requires_grad,
+            op: None,
+            grad_fn: None,
+        }
+    }
+
     pub fn get(&self, index: usize) -> f32 {
         if index >= self.data.len() {
             panic!(

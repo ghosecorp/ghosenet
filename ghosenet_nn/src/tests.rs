@@ -2,7 +2,7 @@
 use ghosenet_tensor::tensor::Tensor;
 use crate::loss::{huber_loss, binary_cross_entropy, mae_loss, kl_divergence};
 use crate::layers::Linear;
-use crate::activations::{ReLU, Sigmoid};
+use crate::activations::{ReLU, Sigmoid, Swish, LeakyReLU, Softmax, Tanh};
 use crate::{Sequential, Module, loss::mse_loss}; // other necessary imports
 // use crate::loss::huber_loss;
 // use std::vec::Vec;
@@ -37,6 +37,72 @@ fn test_simple_forward() {
     println!("Output: {:?}", output.data);
     println!("Loss: {:?}", loss.data);
 }
+
+#[test]
+fn test_relu() {
+    let relu = ReLU;
+    let input = Tensor::new(vec![-1.0, 0.0, 1.0, 3.5], vec![4], false);
+    let output = relu.forward(&input);
+    assert_eq!(output.data, vec![0.0, 0.0, 1.0, 3.5]);
+}
+
+#[test]
+fn test_sigmoid() {
+    let sigmoid = Sigmoid;
+    let input = Tensor::new(vec![-2.0, 0.0, 2.0], vec![3], false);
+    let output = sigmoid.forward(&input);
+    let expected: Vec<f32> = input.data.iter().map(|&x| 1.0 / (1.0 + (-x).exp())).collect();
+    for (o, e) in output.data.iter().zip(expected.iter()) {
+        assert!((o - e).abs() < 1e-5);
+    }
+}
+
+#[test]
+fn test_tanh() {
+    let tanh = Tanh;
+    let input = Tensor::new(vec![-2.0, 0.0, 2.0], vec![3], false);
+    let output = tanh.forward(&input);
+    let expected: Vec<f32> = input.data.iter().map(|&x| x.tanh()).collect();
+    for (o, e) in output.data.iter().zip(expected.iter()) {
+        assert!((o - e).abs() < 1e-5);
+    }
+}
+
+#[test]
+fn test_leaky_relu() {
+    let leaky_relu = LeakyReLU { negative_slope: 0.01 };
+    let input = Tensor::new(vec![-2.0, 0.0, 2.0], vec![3], false);
+    let output = leaky_relu.forward(&input);
+    let expected = vec![-0.02, 0.0, 2.0];
+    for (o, e) in output.data.iter().zip(expected.iter()) {
+        assert!((o - e).abs() < 1e-5);
+    }
+}
+
+#[test]
+fn test_softmax() {
+    let softmax = Softmax;
+    let input = Tensor::new(vec![1.0, 2.0, 3.0], vec![3], false);
+    let output = softmax.forward(&input);
+    let exp_vals: Vec<f32> = input.data.iter().map(|&x| x.exp()).collect();
+    let sum: f32 = exp_vals.iter().sum();
+    let expected: Vec<f32> = exp_vals.iter().map(|&x| x / sum).collect();
+    for (o, e) in output.data.iter().zip(expected.iter()) {
+        assert!((o - e).abs() < 1e-5);
+    }
+}
+
+#[test]
+fn test_swish() {
+    let swish = Swish;
+    let input = Tensor::new(vec![-1.0, 0.0, 1.0], vec![3], false);
+    let output = swish.forward(&input);
+    let expected: Vec<f32> = input.data.iter().map(|&x| x / (1.0 + (-x).exp())).collect();
+    for (o, e) in output.data.iter().zip(expected.iter()) {
+        assert!((o - e).abs() < 1e-5);
+    }
+}
+
 
 #[test]
 fn test_mse_loss_basic() {

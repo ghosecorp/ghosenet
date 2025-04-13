@@ -1,5 +1,6 @@
 use ghosenet_tensor::tensor::Tensor;
 use std::f32;
+use rand::Rng;  // Import the Rng trait
 
 // Xavier/Glorot uniform initialization
 pub fn xavier_uniform(shape: &[usize], requires_grad: bool) -> Tensor {
@@ -10,10 +11,11 @@ pub fn xavier_uniform(shape: &[usize], requires_grad: bool) -> Tensor {
     let size = shape.iter().product::<usize>();
     let mut data = Vec::with_capacity(size);
     
-    // In a real implementation, we'd use proper random number generation
-    // This is just a placeholder for demonstration
-    for i in 0..size {
-        let value = (((i as f32 * 123.456) % 1.0) * 2.0 - 1.0) * limit;
+    let mut rng = rand::thread_rng();  // Create a random number generator
+
+    // Use the random number generator to create values within the range [-limit, limit]
+    for _ in 0..size {
+        let value: f32 = rng.random_range(-limit..limit);  // Random value in the range [-limit, limit]
         data.push(value);
     }
     
