@@ -8,6 +8,9 @@ pub fn mse_loss(input: &Tensor, target: &Tensor) -> Tensor {
 }
 
 pub fn binary_cross_entropy(input: &Tensor, target: &Tensor) -> Tensor {
+    // Ensure input and target have the same shape
+    assert_eq!(input.shape, target.shape, "Input and target shapes must match");
+    
     // BCELoss = -1/N * sum(target * log(input) + (1 - target) * log(1 - input))
     // Clamp input to avoid log(0)
     let mut clamped_input = input.clone();
@@ -16,17 +19,29 @@ pub fn binary_cross_entropy(input: &Tensor, target: &Tensor) -> Tensor {
         clamped_input.data[i] = clamped_input.data[i].max(epsilon).min(1.0 - epsilon);
     }
     
-    let log_input = log(&clamped_input);
-    let log_complement = log(&sub(&Tensor::new(vec![1.0], vec![], false), &clamped_input));
+    let log_input = log(&clamped_input); // log(input)
     
-    let term1 = mul(target, &log_input);
-    let complement_target = sub(&Tensor::new(vec![1.0], target.shape.clone(), false), target);
-    let term2 = mul(&complement_target, &log_complement);
+    // Create a tensor filled with 1.0 with the same shape as input
+    let ones = Tensor::new(vec![1.0; input.data.len()], input.shape.clone(), false);
     
-    let sum_terms = add(&term1, &term2);
-    let neg_mean = mul(&mean(&sum_terms), &Tensor::new(vec![-1.0], vec![], false));
+    let log_complement = log(&sub(&ones, &clamped_input)); // log(1 - input)
+    let term1 = mul(target, &log_input); // target * log(input)
     
-    neg_mean
+    // (1 - target)
+    let complement_target = sub(&ones, target);
+    
+    let term2 = mul(&complement_target, &log_complement); // (1 - target) * log(1 - input)
+    let sum_terms = add(&term1, &term2); // term1 + term2
+    
+    // Calculate mean loss over the batch
+    let mean_loss = mean(&sum_terms); // mean of all losses in the batch
+    
+    // Multiply by -1 to get the final BCE loss
+    // Use a scalar with the correct shape for multiplication
+    let neg_one = Tensor::new(vec![-1.0], vec![1], false);
+    let neg_mean_loss = mul(&mean_loss, &neg_one); // -mean_loss
+    
+    neg_mean_loss
 }
 
 pub fn mae_loss(input: &Tensor, target: &Tensor) -> Tensor {
@@ -64,9 +79,12 @@ pub fn huber_loss(input: &Tensor, target: &Tensor, delta: f32) -> Tensor {
     let delta_tensor = Tensor::new(vec![delta], vec![], false);
     let large_error = mul(&sub(&abs_diff, &mul(&delta_tensor, &Tensor::new(vec![0.5], vec![], false))), &delta_tensor);
 
+    // Loss for each element in the batch
     let loss = condition.select(&small_error, &large_error); // if condition: small_error else: large_error
-    mean(&loss)
+
+    loss
 }
+
 
 pub fn kl_divergence(p: &Tensor, q: &Tensor) -> Tensor {
     let epsilon = 1e-7;

@@ -51,10 +51,22 @@ fn test_mse_loss_basic() {
 fn test_binary_cross_entropy_basic() {
     let input = Tensor::new(vec![0.9, 0.2], vec![2], false);
     let target = Tensor::new(vec![1.0, 0.0], vec![2], false);
+
+    // Compute the binary cross-entropy loss
     let loss = binary_cross_entropy(&input, &target);
-    // Expected: -1/2 * [log(0.9) + log(1 - 0.2)] ≈ -0.5 * [-0.105 + -0.223] = 0.164
-    assert!((loss.data[0] - 0.1642).abs() < 1e-3);
+
+    // Compute the expected value manually
+    let expected_loss = -0.5 * (
+        // loss for sample 1: log(0.9) (target = 1.0)
+        (1.0 * (input.data[0].ln()) + (1.0 - 1.0) * (1.0 - input.data[0]).ln()) + 
+        // loss for sample 2: log(1 - 0.2) (target = 0.0)
+        (0.0 * (input.data[1].ln()) + (1.0 - 0.0) * (1.0 - input.data[1]).ln())
+    );
+
+    // Compare the calculated loss to the expected loss
+    assert!((loss.data[0] - expected_loss).abs() < 1e-3);
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -82,7 +94,9 @@ mod tests {
         let target = Tensor::new(vec![1.0, 1.0, 1.0], vec![3], false);
         let delta = 1.0;
         let loss = huber_loss(&input, &target, delta);
-        // Assert the expected loss values (change according to your expectation)
-        assert_eq!(loss.data, vec![0.125, 0.125, 1.125]); 
+        
+        // Assert the expected loss values
+        assert_eq!(loss.data, vec![0.125, 0.125, 1.0]);
     }
+
 }

@@ -17,7 +17,8 @@ impl Linear {
         let weight = xavier_uniform(&[out_features, in_features], true);
         
         let bias = if bias {
-            Some(zeros(&[out_features], true))
+            // Bias shape should be [1, out_features] for broadcasting
+            Some(zeros(&[1, out_features], true))
         } else {
             None
         };
@@ -29,6 +30,7 @@ impl Linear {
             bias,
         }
     }
+    
 }
 
 impl Module for Linear {
