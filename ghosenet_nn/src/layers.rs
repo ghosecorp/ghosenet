@@ -1,5 +1,5 @@
 use ghosenet_tensor::tensor::{Tensor, OpType};
-use ghosenet_tensor::ops::{matmul, add};
+use ghosenet_tensor::ops::{matmul, add, mean, var};
 use crate::{Module, Parameter};
 use crate::init::{xavier_uniform, zeros};
 use rand::Rng;
@@ -161,8 +161,8 @@ impl Module for Dropout {
 //         // Shape: [batch_size, num_features]
 //         assert_eq!(input.shape[1], self.num_features, "Input features must match");
         
-//         let mean = input.mean(0);
-//         let var = input.var(0, self.eps);
+//         let mean = mean(input);
+//         let var = var(input, self.eps);
 
 //         let normed = (input - &mean) / (&var + self.eps).sqrt();
 //         &normed * &self.gamma + &self.beta
@@ -178,66 +178,66 @@ impl Module for Dropout {
 //     }
 // }
 
-// pub struct Flatten;
+pub struct Flatten;
 
-// impl Module for Flatten {
-//     fn forward(&self, input: &Tensor) -> Tensor {
-//         let new_shape = vec![input.shape.iter().product()];
-//         Tensor::new(input.data.clone(), new_shape, input.requires_grad)
-//     }
+impl Module for Flatten {
+    fn forward(&self, input: &Tensor) -> Tensor {
+        let new_shape = vec![input.shape.iter().product()];
+        Tensor::new(input.data.clone(), new_shape, input.requires_grad)
+    }
 
-//     fn parameters(&self) -> Vec<Tensor> {
-//         Vec::new()
-//     }
+    fn parameters(&self) -> Vec<Tensor> {
+        Vec::new()
+    }
 
-//     fn zero_grad(&mut self) {}
-// }
+    fn zero_grad(&mut self) {}
+}
 
-// pub struct Sequential {
-//     pub layers: Vec<Box<dyn Module>>,
-// }
+pub struct Sequential {
+    pub layers: Vec<Box<dyn Module>>,
+}
 
-// impl Sequential {
-//     pub fn new() -> Self {
-//         Sequential { layers: vec![] }
-//     }
+impl Sequential {
+    pub fn new() -> Self {
+        Sequential { layers: vec![] }
+    }
 
-//     pub fn add(&mut self, layer: Box<dyn Module>) {
-//         self.layers.push(layer);
-//     }
-// }
+    pub fn add(&mut self, layer: Box<dyn Module>) {
+        self.layers.push(layer);
+    }
+}
 
-// impl Module for Sequential {
-//     fn forward(&self, input: &Tensor) -> Tensor {
-//         self.layers.iter().fold(input.clone(), |acc, layer| layer.forward(&acc))
-//     }
+impl Module for Sequential {
+    fn forward(&self, input: &Tensor) -> Tensor {
+        self.layers.iter().fold(input.clone(), |acc, layer| layer.forward(&acc))
+    }
 
-//     fn parameters(&self) -> Vec<Tensor> {
-//         self.layers.iter()
-//             .flat_map(|layer| layer.parameters())
-//             .collect()
-//     }
+    fn parameters(&self) -> Vec<Tensor> {
+        self.layers.iter()
+            .flat_map(|layer| layer.parameters())
+            .collect()
+    }
 
-//     fn zero_grad(&mut self) {
-//         for layer in self.layers.iter_mut() {
-//             layer.zero_grad();
-//         }
-//     }
-// }
+    fn zero_grad(&mut self) {
+        for layer in self.layers.iter_mut() {
+            layer.zero_grad();
+        }
+    }
+}
 
-// pub struct Identity;
+pub struct Identity;
 
-// impl Module for Identity {
-//     fn forward(&self, input: &Tensor) -> Tensor {
-//         input.clone()
-//     }
+impl Module for Identity {
+    fn forward(&self, input: &Tensor) -> Tensor {
+        input.clone()
+    }
 
-//     fn parameters(&self) -> Vec<Tensor> {
-//         vec![]
-//     }
+    fn parameters(&self) -> Vec<Tensor> {
+        vec![]
+    }
 
-//     fn zero_grad(&mut self) {}
-// }
+    fn zero_grad(&mut self) {}
+}
 
 // pub struct Conv1d {
 //     pub in_channels: usize,
@@ -406,7 +406,7 @@ impl Module for Dropout {
 //     pub fn new(num_embeddings: usize, embedding_dim: usize) -> Self {
 //         let mut rng = rand::thread_rng();
 //         let data: Vec<f32> = (0..num_embeddings * embedding_dim)
-//             .map(|_| rng.gen_range(-0.1..0.1))
+//             .map(|_| rng.random_range(-0.1..0.1))
 //             .collect();
 
 //         Self {
@@ -467,8 +467,8 @@ impl Module for Dropout {
 
 // impl Module for LayerNorm {
 //     fn forward(&self, input: &Tensor) -> Tensor {
-//         let mean = input.mean(-1);
-//         let var = input.var(-1, self.eps);
+//         let mean = mean(input);
+//         let var = var(input, self.eps);
 
 //         let normalized = (input - &mean) / (&var + self.eps).sqrt();
 //         &normalized * &self.gamma + &self.beta

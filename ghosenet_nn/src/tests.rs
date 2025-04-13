@@ -1,9 +1,10 @@
 // // tests
 use ghosenet_tensor::tensor::Tensor;
 use crate::loss::{huber_loss, binary_cross_entropy, mae_loss, kl_divergence};
-use crate::layers::Linear;
+// use crate::layers::{Linear, Sequential, Flatten, MaxPool2d, Dropout2d, LayerNorm, Embedding, Conv1d, Identity, BatchNorm1d};
+use crate::layers::{Linear, Sequential, Flatten, Identity, Dropout};
 use crate::activations::{ReLU, Sigmoid, Swish, LeakyReLU, Softmax, Tanh};
-use crate::{Sequential, Module, loss::mse_loss}; // other necessary imports
+use crate::{Sequential as OtherSequential, Module, loss::mse_loss}; // other necessary imports
 // use crate::loss::huber_loss;
 // use std::vec::Vec;
 
@@ -17,7 +18,7 @@ fn test_simple_forward() {
     let input = Tensor::new(input_data, vec![2, 2], false);
 
     // 2. Define model
-    let model = Sequential::new(vec![
+    let model = OtherSequential::new(vec![
         Box::new(Linear::new(2, 3, true)),
         Box::new(ReLU),
         Box::new(Linear::new(3, 1, true)),
@@ -194,3 +195,202 @@ mod tests {
     }
 
 }
+
+#[test]
+fn test_sequential() {
+    let mut seq = Sequential::new();
+    seq.add(Box::new(ReLU {}));
+    seq.add(Box::new(Sigmoid {}));
+    let input = Tensor::new(vec![-1.0, 0.0, 2.0], vec![3], false);
+    let output = seq.forward(&input);
+    assert_eq!(output.data, vec![0.5, 0.5, 0.880797]);
+}
+
+#[test]
+fn test_identity_layer() {
+    let identity = Identity;
+    let input = Tensor::new(vec![1.0, -2.5, 3.3], vec![3], false);
+
+    // Forward should return the same data and shape
+    let output = identity.forward(&input);
+    assert_eq!(output.data, input.data);
+    assert_eq!(output.shape, input.shape);
+
+    // Parameters should be empty
+    let params = identity.parameters();
+    assert!(params.is_empty());
+
+    // zero_grad should not panic or modify anything
+    let mut identity_mut = Identity;
+    identity_mut.zero_grad(); // no assertion needed; we just ensure it doesn't panic
+}
+
+#[test]
+fn test_flatten_layer() {
+    let flatten = Flatten;
+    let input = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2], true);
+    let output = flatten.forward(&input);
+
+    assert_eq!(output.data, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(output.shape, vec![4]);
+    assert_eq!(output.requires_grad, true);
+    
+    assert!(flatten.parameters().is_empty());
+}
+
+#[test]
+fn test_dropout_eval_mode() {
+    let mut dropout = Dropout::new(0.5);
+    dropout.eval(); // disable dropout
+    let input = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![4], false);
+    let output = dropout.forward(&input);
+
+    assert_eq!(output.data, input.data);
+    assert_eq!(output.shape, input.shape);
+}
+
+#[test]
+fn test_dropout_train_mode() {
+    let mut dropout = Dropout::new(0.5);
+    dropout.train(); // enable dropout
+    let input = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![4], false);
+    let output = dropout.forward(&input);
+
+    // Check that one element is zeroed (i % 4 == 0 => 0th element)
+    // and others are scaled by 1 / (1 - p) = 2.0
+    assert_eq!(output.data[0], 0.0);
+    assert_eq!(output.data[1], 4.0); // 2.0 * 2.0
+    assert_eq!(output.data[2], 6.0); // 3.0 * 2.0
+    assert_eq!(output.data[3], 8.0); // 4.0 * 2.0
+
+    assert_eq!(output.shape, input.shape);
+}
+
+#[test]
+fn test_dropout_probability_bounds() {
+    let _ = Dropout::new(0.0); // should work
+    let _ = Dropout::new(0.99); // should work
+
+    // Uncommenting below should panic
+    // let _ = Dropout::new(-0.1); // should panic
+    // let _ = Dropout::new(1.0); // should panic
+}
+
+#[test]
+fn test_dropout_no_parameters() {
+    let dropout = Dropout::new(0.3);
+    assert!(dropout.parameters().is_empty());
+}
+
+
+// #[cfg(test)]
+// mod tests {
+//     use ghosenet_tensor::tensor::Tensor;
+//     use ghosenet_tensor::ops::*;
+//     use crate::*;
+
+//     #[test]
+//     fn test_relu() {
+//         let input = Tensor::new(vec![-1.0, 0.0, 1.0, 2.0], vec![2, 2], false);
+//         let relu = ReLU;
+//         let output = relu.forward(&input);
+//         assert_eq!(output.data, vec![0.0, 0.0, 1.0, 2.0]);
+//     }
+
+//     #[test]
+//     fn test_sigmoid() {
+//         let input = Tensor::new(vec![0.0], vec![1], false);
+//         let sigmoid = Sigmoid;
+//         let output = sigmoid.forward(&input);
+//         assert!((output.data[0] - 0.5).abs() < 1e-5);
+//     }
+
+//     #[test]
+//     fn test_batchnorm1d_training() {
+//         let input = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2], false);
+//         let bn = BatchNorm1d::new(2, 1e-5, 0.1);
+//         let output = bn.forward(&input);
+//         assert_eq!(output.shape, vec![2, 2]);
+//     }
+
+//     #[test]
+//     fn test_flatten() {
+//         let input = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2], false);
+//         let flatten = Flatten;
+//         let output = flatten.forward(&input);
+//         assert_eq!(output.shape, vec![4]);
+//     }
+
+//     #[test]
+//     fn test_identity() {
+//         let input = Tensor::new(vec![1.0, 2.0], vec![2], false);
+//         let id = Identity;
+//         let output = id.forward(&input);
+//         assert_eq!(output.data, input.data);
+//     }
+
+//     #[test]
+//     fn test_conv1d() {
+//         let conv = Conv1d::new(1, 1, 2, 1, 0, false);
+//         let input = Tensor::new(vec![1.0, 2.0, 3.0], vec![1, 1, 3], false);
+//         let output = conv.forward(&input);
+//         assert_eq!(output.shape[2], 2);
+//     }
+
+//     #[test]
+//     fn test_conv2d_shape() {
+//         let conv = Conv2d::new(1, 1, (2, 2), (1, 1), (0, 0), false);
+//         let input = Tensor::new(vec![1.0; 1 * 1 * 4 * 4], vec![1, 1, 4, 4], false);
+//         let output = conv.forward(&input);
+//         assert_eq!(output.shape, vec![1, 1, 3, 3]);
+//     }
+
+//     #[test]
+//     fn test_embedding() {
+//         let embedding = Embedding::new(10, 4);
+//         let input = Tensor::new(vec![1.0, 3.0], vec![2], false);
+//         let output = embedding.forward(&input);
+//         assert_eq!(output.shape, vec![2, 4]);
+//     }
+
+//     #[test]
+//     fn test_layernorm() {
+//         let input = Tensor::new(vec![1.0, 2.0, 3.0], vec![1, 3], false);
+//         let norm = LayerNorm::new(3, 1e-5);
+//         let output = norm.forward(&input);
+//         assert_eq!(output.shape, vec![1, 3]);
+//     }
+
+//     #[test]
+//     fn test_dropout2d_train_and_eval() {
+//         let input = Tensor::new(vec![1.0; 2 * 3 * 4 * 4], vec![2, 3, 4, 4], false);
+//         let mut dropout = Dropout2d::new(0.5);
+
+//         dropout.train();
+//         let output_train = dropout.forward(&input);
+//         assert_eq!(output_train.shape, input.shape);
+
+//         dropout.eval();
+//         let output_eval = dropout.forward(&input);
+//         assert_eq!(output_eval.data, input.data);
+//     }
+
+//     #[test]
+//     fn test_maxpool2d() {
+//         let input = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![1, 1, 2, 2], false);
+//         let pool = MaxPool2d::new((2, 2), None);
+//         let output = pool.forward(&input);
+//         assert_eq!(output.data[0], 4.0);
+//         assert_eq!(output.shape, vec![1, 1, 1, 1]);
+//     }
+
+//     #[test]
+//     fn test_sequential() {
+//         let mut seq = Sequential::new();
+//         seq.add(Box::new(ReLU));
+//         seq.add(Box::new(Flatten));
+//         let input = Tensor::new(vec![-1.0, 0.0, 2.0], vec![3], false);
+//         let output = seq.forward(&input);
+//         assert_eq!(output.data, vec![0.0, 0.0, 2.0]);
+//     }
+// }
