@@ -1,6 +1,6 @@
 // // tests
 use ghosenet_tensor::tensor::Tensor;
-use crate::loss::{huber_loss, binary_cross_entropy};
+use crate::loss::{huber_loss, binary_cross_entropy, mae_loss, kl_divergence};
 use crate::layers::Linear;
 use crate::activations::{ReLU, Sigmoid};
 use crate::{Sequential, Module, loss::mse_loss}; // other necessary imports
@@ -67,6 +67,34 @@ fn test_binary_cross_entropy_basic() {
     assert!((loss.data[0] - expected_loss).abs() < 1e-3);
 }
 
+#[test]
+fn test_mae_loss() {
+    // Define input (predictions) and target tensors
+    let input = Tensor::new(vec![0.5, 1.5, 2.5], vec![3], false);
+    let target = Tensor::new(vec![1.0, 1.0, 1.0], vec![3], false);
+    
+    // Compute the MAE loss
+    let loss = mae_loss(&input, &target);
+    
+    // Manually calculate expected loss: 
+    // |0.5 - 1.0| + |1.5 - 1.0| + |2.5 - 1.0| = 0.5 + 0.5 + 1.5 = 2.5
+    // Mean = 2.5 / 3 = 0.8333...
+    
+    assert_eq!(loss.data, vec![0.83333333]);  // Expect the mean loss value
+}
+
+#[test]
+fn test_kl_divergence() {
+    let p = Tensor::new(vec![0.4, 0.6], vec![2], false);  // Probabilities of p
+    let q = Tensor::new(vec![0.5, 0.5], vec![2], false);  // Probabilities of q
+    
+    // Compute the KL divergence loss
+    let loss = kl_divergence(&p, &q);
+    
+    // The expected value is the mean of the KL divergence terms
+    // Sum of terms: 0.02013655, and the mean is 0.010068275
+    assert!((loss.data[0] - 0.010068275).abs() < 1e-6, "KL Divergence Test Failed: expected 0.010068275, got {}", loss.data[0]);
+}
 
 #[cfg(test)]
 mod tests {

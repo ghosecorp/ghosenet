@@ -88,6 +88,8 @@ pub fn huber_loss(input: &Tensor, target: &Tensor, delta: f32) -> Tensor {
 
 pub fn kl_divergence(p: &Tensor, q: &Tensor) -> Tensor {
     let epsilon = 1e-7;
+    
+    // Clamp the values of p and q to avoid log(0)
     let mut p_clamped = p.clone();
     let mut q_clamped = q.clone();
     for i in 0..p.data.len() {
@@ -95,7 +97,16 @@ pub fn kl_divergence(p: &Tensor, q: &Tensor) -> Tensor {
         q_clamped.data[i] = q_clamped.data[i].max(epsilon);
     }
 
-    let log_ratio = log(&div(&p_clamped, &q_clamped));
-    let kl = mul(&p_clamped, &log_ratio);
-    mean(&kl)
+    // Calculate log(p / q)
+    let ratio = div(&p_clamped, &q_clamped);
+    let log_ratio = log(&ratio);
+
+    // Compute p * log(p / q)
+    let kl_terms = mul(&p_clamped, &log_ratio);
+
+    // Print the intermediate terms for debugging
+    println!("KL terms: {:?}", kl_terms.data);
+
+    // Return the mean of the KL terms
+    mean(&kl_terms)
 }
